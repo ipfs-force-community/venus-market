@@ -320,9 +320,10 @@ func (pna *ProviderNodeAdapter) WaitForPublishDeals(ctx context.Context, publish
 	pna.lk.Lock()
 	pm, ok := pna.pendingMsgs[publishCid]
 	if !ok {
-		pm = &pendingMsg{
+		pna.pendingMsgs[publishCid] = &pendingMsg{
 			ctx: ctx,
 		}
+		pm = pna.pendingMsgs[publishCid]
 	}
 	pm.tasks = append(pm.tasks, msgWaitTask{
 		ctx:      ctx,
@@ -380,6 +381,7 @@ func (pna *ProviderNodeAdapter) waitMsgResp(ctx context.Context, publishCid cid.
 		}()
 		task.resp <- msgWaitResp{r, err}
 	}
+	delete(pna.pendingMsgs, publishCid)
 }
 
 func (pna *ProviderNodeAdapter) GetDataCap(ctx context.Context, addr address.Address, encodedTs shared.TipSetToken) (*abi.StoragePower, error) {
