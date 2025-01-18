@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/venus/venus-shared/api/chain/v1/mock"
 	"github.com/filecoin-project/venus/venus-shared/types"
 	"github.com/golang/mock/gomock"
 	"github.com/ipfs-force-community/droplet/v2/api/clients"
@@ -49,6 +50,40 @@ func TestWaitMessage(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, res)
 			fmt.Println(i)
+			<-ch
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	full := mock.NewMockFullNode(ctrl)
+	m = clients.NewMockIMixMessage(ctrl)
+	pna = &ProviderNodeAdapter{
+		FullNode:    full,
+		msgClient:   m,
+		pendingMsgs: map[cid.Cid]*pendingMsg{},
+	}
+
+	m.EXPECT().WaitMsg(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().DoAndReturn(
+		func(ctx context.Context, msg cid.Cid, confidence uint64, limit abi.ChainEpoch, allowReplaced bool) (*types.MsgLookup, error) {
+			time.Sleep(time.Millisecond * 10)
+			return &types.MsgLookup{
+				Message: msg,
+				Receipt: types.MessageReceipt{
+					ExitCode: 0,
+				},
+			}, nil
+		})
+
+	full.EXPECT().ChainHead(gomock.Any()).AnyTimes().Return(nil, fmt.Errorf("chain error"))
+
+	for i := 0; i < 100000; i++ {
+		wg.Add(1)
+		ch <- struct{}{}
+		go func() {
+			res, err := pna.WaitForPublishDeals(context.Background(), cid.Cid{}, types.DealProposal{})
+			assert.Contains(t, err.Error(), "chain error")
+			assert.Nil(t, res)
 			<-ch
 			wg.Done()
 		}()

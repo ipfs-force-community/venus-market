@@ -344,6 +344,8 @@ func (pna *ProviderNodeAdapter) WaitForPublishDeals(ctx context.Context, publish
 				pna.waitMsgResp(ctx, publishCid, receipt, fmt.Errorf("WaitForPublishDeals exit code: %s", receipt.Receipt.ExitCode))
 				return
 			}
+
+			pna.waitMsgResp(ctx, publishCid, receipt, nil)
 		}()
 	})
 
